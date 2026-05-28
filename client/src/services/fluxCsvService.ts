@@ -22,8 +22,10 @@ const CSV_HEADER = [
   "Temperature Max",
   "Humidity Min",
   "Humidity Max",
+  "Slope Multiplier",
   "CO2 Multiplier",
   "CO2 Offset",
+  "GPS Error (m)",
 ].join(",");
 
 export interface FluxRow {
@@ -41,8 +43,10 @@ export interface FluxRow {
   tempMax: number;
   humMin: number;
   humMax: number;
+  co2SlopeMultiplier: number;
   co2Multiplier: number;
   co2Offset: number;
+  gpsErrorMeters: number;
 }
 
 function meanOf(values: number[]): number {
@@ -113,9 +117,11 @@ function buildFluxRow(
     ),
     longitude,
     latitude,
-    co2Slope: +(regression.slope * 1000).toFixed(
-      config.measurementCards.co2.slopePrecision,
-    ),
+    co2Slope: +(
+      regression.slope *
+      1000 *
+      settingsStore.deviceSettings.settings.co2SlopeMultiplier
+    ).toFixed(config.measurementCards.co2.slopePrecision),
     co2R2: regression.rSquared,
     co2Min: co2.min,
     co2Max: co2.max,
@@ -123,8 +129,10 @@ function buildFluxRow(
     tempMax: temp.max,
     humMin: hum.min,
     humMax: hum.max,
+    co2SlopeMultiplier: settingsStore.deviceSettings.settings.co2SlopeMultiplier,
     co2Multiplier,
     co2Offset,
+    gpsErrorMeters: +gpsLocation.accuracy.toFixed(0),
   };
 }
 
@@ -144,8 +152,10 @@ function formatRow(row: FluxRow): string {
     row.tempMax,
     row.humMin,
     row.humMax,
+    row.co2SlopeMultiplier,
     row.co2Multiplier,
     row.co2Offset,
+    row.gpsErrorMeters,
   ].join(",");
 }
 
@@ -189,30 +199,57 @@ function parseRow(line: string): FluxRow | null {
   if (cols.length < 15) return null;
 
   const hasDurationColumn = cols.length >= 16;
-  const colOffset = hasDurationColumn ? 1 : 0;
+  const hasSlopeMultiplier = cols.length >= 17;
+  const hasGpsErrorColumn = cols.length >= 18;
 
-  const parsedDuration = Number(hasDurationColumn ? cols[3] : 0);
-  const parsedMultiplier = Number(cols[13 + colOffset] ?? 1);
-  const parsedOffset = Number(cols[14 + colOffset] ?? 0);
+  const timestampIndex = 0;
+  const dateIndex = 1;
+  const sensorIndex = 2;
+  const durationIndex = hasDurationColumn ? 3 : -1;
+  const longitudeIndex = hasDurationColumn ? 4 : 3;
+  const latitudeIndex = hasDurationColumn ? 5 : 4;
+  const co2SlopeIndex = hasDurationColumn ? 6 : 5;
+  const co2R2Index = co2SlopeIndex + 1;
+  const co2MinIndex = co2SlopeIndex + 2;
+  const co2MaxIndex = co2SlopeIndex + 3;
+  const tempMinIndex = co2SlopeIndex + 4;
+  const tempMaxIndex = co2SlopeIndex + 5;
+  const humMinIndex = co2SlopeIndex + 6;
+  const humMaxIndex = co2SlopeIndex + 7;
+  const slopeMultiplierIndex = hasSlopeMultiplier ? 14 : -1;
+  const multiplierIndex = hasSlopeMultiplier ? 15 : 14;
+  const offsetIndex = hasSlopeMultiplier ? 16 : 15;
+  const gpsErrorIndex = hasGpsErrorColumn ? 17 : -1;
+
+  const parsedDuration = durationIndex >= 0 ? Number(cols[durationIndex]) : 0;
+  const parsedSlopeMultiplier =
+    slopeMultiplierIndex >= 0 ? Number(cols[slopeMultiplierIndex]) : 1;
+  const parsedMultiplier = Number(cols[multiplierIndex] ?? 1);
+  const parsedOffset = Number(cols[offsetIndex] ?? 0);
+  const parsedGpsError = gpsErrorIndex >= 0 ? Number(cols[gpsErrorIndex]) : 0;
 
   const row: FluxRow = {
-    timestamp: Number(cols[0]),
-    date: cols[1],
-    sensorName: String(cols[2]),
+    timestamp: Number(cols[timestampIndex]),
+    date: cols[dateIndex],
+    sensorName: String(cols[sensorIndex]),
     selectionDurationSeconds:
       Number.isFinite(parsedDuration) && parsedDuration >= 0 ? parsedDuration : 0,
-    longitude: Number(cols[3 + colOffset]),
-    latitude: Number(cols[4 + colOffset]),
-    co2Slope: Number(cols[5 + colOffset]),
-    co2R2: Number(cols[6 + colOffset]),
-    co2Min: Number(cols[7 + colOffset]),
-    co2Max: Number(cols[8 + colOffset]),
-    tempMin: Number(cols[9 + colOffset]),
-    tempMax: Number(cols[10 + colOffset]),
-    humMin: Number(cols[11 + colOffset]),
-    humMax: Number(cols[12 + colOffset]),
+    longitude: Number(cols[longitudeIndex]),
+    latitude: Number(cols[latitudeIndex]),
+    co2Slope: Number(cols[co2SlopeIndex]),
+    co2R2: Number(cols[co2R2Index]),
+    co2Min: Number(cols[co2MinIndex]),
+    co2Max: Number(cols[co2MaxIndex]),
+    tempMin: Number(cols[tempMinIndex]),
+    tempMax: Number(cols[tempMaxIndex]),
+    humMin: Number(cols[humMinIndex]),
+    humMax: Number(cols[humMaxIndex]),
+    co2SlopeMultiplier: Number.isFinite(parsedSlopeMultiplier)
+      ? parsedSlopeMultiplier
+      : 1,
     co2Multiplier: Number.isFinite(parsedMultiplier) ? parsedMultiplier : 1,
     co2Offset: Number.isFinite(parsedOffset) ? parsedOffset : 0,
+    gpsErrorMeters: Number.isFinite(parsedGpsError) ? parsedGpsError : 0,
   };
 
   if (!Number.isFinite(row.latitude) || !Number.isFinite(row.longitude))

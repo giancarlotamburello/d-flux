@@ -16,6 +16,7 @@ const props = defineProps<ToasterProps>()
       '--normal-border': 'var(--border)',
       '--border-radius': 'var(--radius)',
     }"
+    position="top-center"
     v-bind="props"
   >
     <template #success-icon>

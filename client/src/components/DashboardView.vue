@@ -51,6 +51,9 @@ async function toggleScan(): Promise<void> {
 async function handleSaveFlux() {
   try {
     await analyzeStore.saveFluxData();
+    // Play success sound
+    const audio = new Audio('data:audio/wav;base64,UklGRiYAAABXQVZFZm10IBAAAAABAAEAQB8AAAB9AAACABAAZGF0YQIAAAAAAA==');
+    audio.play().catch(() => {});
     toast.success("Flux data saved");
   } catch (err: any) {
     toast.error(err?.message ?? "Failed to save flux data");

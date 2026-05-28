@@ -25,6 +25,9 @@ import {
   linearRegression,
   type RegressionResult,
 } from "@/services/linearRegression";
+import { useSettingsStore } from "@/stores/settingsStore";
+
+const settingsStore = useSettingsStore();
 
 const props = defineProps<{
   title: string;
@@ -112,9 +115,14 @@ const regressionResult = computed<RegressionResult | null>(() => {
   return linearRegression(selected);
 });
 
-const formattedSlope = computed(
-  () => regressionResult.value?.slope.toFixed(6) ?? "—",
-);
+const formattedSlope = computed(() => {
+  if (!regressionResult.value) return "—";
+  // Apply slope multiplier only for CO2 data
+  const multiplier = props.dataKey === "co2" 
+    ? settingsStore.deviceSettings.settings.co2SlopeMultiplier 
+    : 1;
+  return (regressionResult.value.slope * multiplier).toFixed(6);
+});
 const formattedIntercept = computed(
   () => regressionResult.value?.intercept.toFixed(2) ?? "—",
 );

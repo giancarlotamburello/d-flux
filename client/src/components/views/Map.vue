@@ -5,6 +5,7 @@ import "leaflet/dist/leaflet.css";
 import markerIconUrl from "leaflet/dist/images/marker-icon.png";
 import markerIconRetinaUrl from "leaflet/dist/images/marker-icon-2x.png";
 import markerShadowUrl from "leaflet/dist/images/marker-shadow.png";
+import { watchPosition, clearWatch } from "@tauri-apps/plugin-geolocation";
 import { loadFluxData, type FluxRow } from "@/services/fluxCsvService";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { Spinner } from "@/components/ui/spinner";
@@ -20,11 +21,16 @@ const loading = ref(false);
 const error = ref<string | null>(null);
 const pointCount = ref(0);
 const isSatellite = ref(false);
+const currentLocation = ref<[number, number] | null>(null);
+const gpsAccuracy = ref<number | null>(null);
 
 let map: L.Map | null = null;
 let markerGroup: L.LayerGroup | null = null;
 let streetLayer: L.TileLayer | null = null;
 let satelliteLayer: L.TileLayer | null = null;
+let currentPositionMarker: L.Marker | null = null;
+let accuracyCircle: L.Circle | null = null;
+let gpsWatchId: number | null = null;
 
 function buildPopup(row: FluxRow): string {
   const date = new Date(row.date).toLocaleString();
@@ -72,6 +78,32 @@ function makeDotIcon(color: string): L.DivIcon {
   });
 }
 
+function makeCurrentPositionIcon(): L.DivIcon {
+  return L.divIcon({
+    className: "current-position-marker",
+    iconSize: [24, 24],
+    iconAnchor: [12, 12],
+    popupAnchor: [0, -12],
+    html: `<div style="
+      width:24px;height:24px;
+      border-radius:50%;
+      background:#3b82f6;
+      border:3px solid #fff;
+      box-shadow:0 0 0 2px #3b82f6, 0 2px 8px rgba(0,0,0,.4);
+      position:relative;
+    ">
+      <div style="
+        position:absolute;
+        width:6px;height:6px;
+        background:#fff;
+        border-radius:50%;
+        top:50%;left:50%;
+        transform:translate(-50%,-50%);
+      "></div>
+    </div>`,
+  });
+}
+
 async function loadPoints() {
   if (!map) return;
 
@@ -92,7 +124,11 @@ async function loadPoints() {
     const rows = await loadFluxData(folder);
     pointCount.value = rows.length;
 
-    if (markerGroup) markerGroup.clearLayers();
+    if (markerGroup) {
+      markerGroup.clearLayers();
+    } else {
+      markerGroup = L.layerGroup().addTo(map);
+    }
 
     if (rows.length === 0) {
       error.value = "No flux data points saved yet.";
@@ -114,10 +150,12 @@ async function loadPoints() {
       markerGroup!.addLayer(marker);
     }
 
-    if (bounds.length === 1) {
-      map.setView(bounds[0] as L.LatLngExpression, 15);
-    } else {
-      map.fitBounds(L.latLngBounds(bounds), { padding: [40, 40] });
+    if (bounds.length > 0) {
+      if (bounds.length === 1) {
+        map.setView(bounds[0] as L.LatLngExpression, 15);
+      } else {
+        map.fitBounds(L.latLngBounds(bounds), { padding: [50, 50] });
+      }
     }
   } catch (err: any) {
     error.value = err?.message ?? "Failed to load flux data";
@@ -127,8 +165,56 @@ async function loadPoints() {
   }
 }
 
+function updateCurrentPositionMarker() {
+  if (!map || !currentLocation.value) return;
+
+  // Check if this is the first time we are getting a location
+  const isFirstFix = currentPositionMarker === null;
+
+  if (currentPositionMarker) {
+    currentPositionMarker.setLatLng(currentLocation.value);
+  } else {
+    currentPositionMarker = L.marker(currentLocation.value, {
+      icon: makeCurrentPositionIcon(),
+    })
+      .bindPopup(() => {
+        const acc = gpsAccuracy.value
+          ? ` (±${gpsAccuracy.value.toFixed(0)}m)`
+          : "";
+        return `<strong>Current Position</strong>${acc}<br/>${currentLocation.value![0].toFixed(6)}, ${currentLocation.value![1].toFixed(6)}`;
+      })
+      .addTo(map);
+  }
+
+  if (gpsAccuracy.value !== null) {
+    if (accuracyCircle) {
+      accuracyCircle.setLatLng(currentLocation.value);
+      accuracyCircle.setRadius(gpsAccuracy.value);
+    } else {
+      accuracyCircle = L.circle(currentLocation.value, {
+        radius: gpsAccuracy.value,
+        color: "#3b82f6",
+        fillColor: "#3b82f6",
+        fillOpacity: 0.1,
+        weight: 2,
+        dashArray: "5,5",
+      }).addTo(map);
+    }
+  }
+
+  // --- ADDED: Move the camera to the user on the first GPS fix ---
+  if (isFirstFix) {
+    map.setView(currentLocation.value, 15); // 15 is the zoom level
+  }
+}
+
 onMounted(async () => {
   if (!mapContainer.value) return;
+
+  // Reset references from previous mount
+  currentPositionMarker = null;
+  accuracyCircle = null;
+  gpsWatchId = null;
 
   map = L.map(mapContainer.value, {
     center: [48.2, 16.37],
@@ -157,12 +243,51 @@ onMounted(async () => {
   await nextTick();
   map.invalidateSize();
 
+  // Start watching GPS position
+  try {
+    gpsWatchId = await watchPosition(
+      {
+        enableHighAccuracy: true,
+        maximumAge: 0,
+        timeout: 5000,
+      },
+      (position) => {
+        if (position?.coords) {
+          currentLocation.value = [
+            position.coords.latitude,
+            position.coords.longitude,
+          ];
+          gpsAccuracy.value = position.coords.accuracy;
+          updateCurrentPositionMarker();
+        }
+      },
+    );
+  } catch (err) {
+    console.warn("GPS watch failed (may not have permission):", err);
+  }
+
+  await nextTick();
   loadPoints();
 });
 
-watch(() => settingsStore.saveFolderPath, loadPoints);
+watch(
+  [() => map, () => settingsStore.saveFolderPath],
+  ([m, path]) => {
+    if (m && path) loadPoints();
+  },
+  { immediate: true },
+);
 
 onBeforeUnmount(() => {
+  if (gpsWatchId !== null) {
+    clearWatch(gpsWatchId);
+  }
+  if (currentPositionMarker) {
+    currentPositionMarker.remove();
+  }
+  if (accuracyCircle) {
+    accuracyCircle.remove();
+  }
   map?.remove();
   map = null;
 });

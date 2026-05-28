@@ -42,6 +42,9 @@ const currentOffset = ref(
 const currentMultiplier = ref(
   settingsStore.deviceSettings.settings.co2CalibrationMultiplier,
 );
+const currentSlopeMultiplier = ref(
+  settingsStore.deviceSettings.settings.co2SlopeMultiplier,
+);
 const currentHwCalibrationReference = ref(
   settingsStore.deviceSettings.settings.hardwareCalibrationReference,
 );
@@ -52,7 +55,9 @@ const isSynchronized = computed(() => {
     currentOffset.value ===
       settingsStore.deviceSettings.settings.co2CalibrationOffset &&
     currentMultiplier.value ===
-      settingsStore.deviceSettings.settings.co2CalibrationMultiplier
+      settingsStore.deviceSettings.settings.co2CalibrationMultiplier &&
+    currentSlopeMultiplier.value ===
+      settingsStore.deviceSettings.settings.co2SlopeMultiplier
   );
 });
 
@@ -68,6 +73,11 @@ const handleSave = async () => {
     currentOffset.value;
   settingsStore.deviceSettings.settings.co2CalibrationMultiplier =
     currentMultiplier.value;
+  settingsStore.deviceSettings.settings.co2SlopeMultiplier =
+    currentSlopeMultiplier.value;
+
+  // Persist to localStorage
+  settingsStore.saveDeviceSettings();
   settingsStore.deviceSettings.applied = true;
   saving.value = false;
 };
@@ -154,10 +164,43 @@ const applyHwCalibration = async () => {
       <div class="rounded-lg border p-4 space-y-3">
         <div class="space-y-0.5">
           <div class="flex items-center justify-between">
-            <Label class="text-base font-medium"
-              >CO₂ hardware calibration</Label
-            >
+            <Label class="text-base font-medium">CO₂ slope multiplier</Label>
 
+            <Badge variant="secondary"> Software </Badge>
+          </div>
+          <p class="text-sm text-muted-foreground">
+            A multiplier for the calculated CO₂ slope to facilitate a
+            conversion to other measurement units (e.g. g/m²/day).
+          </p>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <div class="w-full">
+            <NumberField
+              id="slope-multiplier"
+              v-model="currentSlopeMultiplier"
+              :default-value="1"
+              :step="0.01"
+              class="w-full"
+            >
+              <Label for="slope-multiplier">Multiplier</Label>
+              <NumberFieldContent>
+                <NumberFieldDecrement />
+                <NumberFieldInput />
+                <NumberFieldIncrement />
+              </NumberFieldContent>
+            </NumberField>
+            <p v-if="currentSlopeMultiplier === 0" class="text-red-500 mt-2">
+              ⚠️ Multiplier is <strong>0</strong>
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div class="rounded-lg border p-4 space-y-3">
+        <div class="space-y-0.5">
+          <div class="flex items-center justify-between">
+            <Label class="text-base font-medium">Forced calibration</Label>
             <Badge variant="secondary"> Hardware </Badge>
           </div>
           <p class="text-sm text-muted-foreground">

@@ -6,6 +6,30 @@ const saveFolderPath = useStorage("saveFolderPath", "");
 const saveFolderUriRaw = useStorage("saveFolderUri", ""); // Store full URI object as JSON
 const doneFirstSetup = useStorage("doneFirstSetup", false);
 
+// Device settings stored in localStorage
+const deviceSettingsStorage = useStorage(
+  "deviceSettings",
+  JSON.stringify({
+    co2CalibrationOffset: 0.0,
+    co2CalibrationMultiplier: 1.0,
+    co2SlopeMultiplier: 1.0,
+    hardwareCalibrationReference: 400,
+  })
+);
+
+function parseDeviceSettings() {
+  try {
+    return JSON.parse(deviceSettingsStorage.value);
+  } catch {
+    return {
+      co2CalibrationOffset: 0.0,
+      co2CalibrationMultiplier: 1.0,
+      co2SlopeMultiplier: 1.0,
+      hardwareCalibrationReference: 400,
+    };
+  }
+}
+
 async function init() {
   const storedUri = saveFolderUriRaw.value
     ? (() => {
@@ -34,13 +58,7 @@ export const useSettingsStore = defineStore("settings", {
 
     deviceSettings: {
       applied: true,
-
-      settings: {
-        co2CalibrationOffset: 0.0,
-        co2CalibrationMultiplier: 1.0,
-
-        hardwareCalibrationReference: 400,
-      },
+      settings: parseDeviceSettings(),
     },
   }),
   getters: {
@@ -57,6 +75,11 @@ export const useSettingsStore = defineStore("settings", {
     setSaveFolder(path: string, uri: AndroidFsUri | null = null) {
       this.saveFolderPath = path;
       saveFolderUriRaw.value = uri ? JSON.stringify(uri) : "";
+    },
+    saveDeviceSettings() {
+      deviceSettingsStorage.value = JSON.stringify(
+        this.deviceSettings.settings
+      );
     },
   },
 });
