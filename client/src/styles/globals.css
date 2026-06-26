@@ -124,15 +124,19 @@
   /* Scrollbar */
   ::-webkit-scrollbar {
     width: 5px;
+    height: 5px;
   }
   ::-webkit-scrollbar-track {
     background: transparent;
   }
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
   ::-webkit-scrollbar-thumb {
-    background: var(--color-primary);
+    background: var(--color-border);
     border-radius: 10px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #555;
+    background: var(--color-muted-foreground);
   }
 }

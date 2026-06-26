@@ -4,6 +4,15 @@ import { loadFluxData, type FluxRow } from "@/services/fluxCsvService";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Icon } from "@iconify/vue";
 
 const settingsStore = useSettingsStore();
 const rows = ref<FluxRow[]>([]);
@@ -45,7 +54,7 @@ onMounted(loadData);
     <div class="flex items-center justify-between">
       <h2 class="text-xl font-semibold">Flux Data</h2>
       <Button @click="loadData" variant="outline" size="sm">
-        ↻ Reload
+        <Icon icon="lucide:refresh-cw" /> Reload
       </Button>
     </div>
 
@@ -64,56 +73,57 @@ onMounted(loadData);
     </div>
 
     <div v-else class="overflow-x-auto flex-1 border rounded-lg">
-      <table class="w-full text-sm">
-        <thead class="bg-muted sticky top-0">
-          <tr>
-            <th class="px-4 py-2 text-left font-semibold">Date</th>
-            <th class="px-4 py-2 text-left font-semibold">Device</th>
-            <th class="px-4 py-2 text-right font-semibold">CO₂ (ppm)</th>
-            <th class="px-4 py-2 text-right font-semibold">Temp (°C)</th>
-            <th class="px-4 py-2 text-right font-semibold">Humidity (%)</th>
-            <th class="px-4 py-2 text-right font-semibold">Slope</th>
-            <th class="px-4 py-2 text-right font-semibold">Slope Multiplier</th>
-            <th class="px-4 py-2 text-right font-semibold">R²</th>
-            <th class="px-4 py-2 text-right font-semibold">Latitude</th>
-            <th class="px-4 py-2 text-right font-semibold">Longitude</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr
-            v-for="(row, idx) in rows"
-            :key="idx"
-            class="border-t hover:bg-muted/50 transition-colors"
-          >
-            <td class="px-4 py-2">{{ new Date(row.date).toLocaleString() }}</td>
-            <td class="px-4 py-2">{{ row.sensorName }}</td>
-            <td class="px-4 py-2 text-right">
-              {{ row.co2Min }} – {{ row.co2Max }}
-            </td>
-            <td class="px-4 py-2 text-right">
-              {{ row.tempMin }} – {{ row.tempMax }}
-            </td>
-            <td class="px-4 py-2 text-right">
-              {{ row.humMin }} – {{ row.humMax }}
-            </td>
-            <td class="px-4 py-2 text-right">{{ row.co2Slope.toFixed(4) }}</td>
-            <td class="px-4 py-2 text-right">{{ row.co2SlopeMultiplier.toFixed(2) }}</td>
-            <td class="px-4 py-2 text-right">{{ row.co2R2.toFixed(4) }}</td>
-            <td class="px-4 py-2 text-right">{{ row.latitude.toFixed(6) }}</td>
-            <td class="px-4 py-2 text-right">{{ row.longitude.toFixed(6) }}</td>
-          </tr>
-        </tbody>
-      </table>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Date</TableHead>
+            <TableHead>Device</TableHead>
+            <TableHead class="text-right">CO₂ (ppm)</TableHead>
+            <TableHead class="text-right">Temp (°C)</TableHead>
+            <TableHead class="text-right">Humidity (%)</TableHead>
+            <TableHead class="text-right">Slope</TableHead>
+            <TableHead class="text-right">Slope Multiplier</TableHead>
+            <TableHead class="text-right">R²</TableHead>
+            <TableHead class="text-right">Latitude</TableHead>
+            <TableHead class="text-right">Longitude</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          <TableRow v-for="(row, idx) in rows" :key="idx">
+            <TableCell>{{ new Date(row.date).toLocaleString() }}</TableCell>
+            <TableCell>{{ row.sensorName }}</TableCell>
+            <TableCell class="text-right"
+              >{{ row.co2Min }} – {{ row.co2Max }}</TableCell
+            >
+            <TableCell class="text-right"
+              >{{ row.tempMin }} – {{ row.tempMax }}</TableCell
+            >
+            <TableCell class="text-right"
+              >{{ row.humMin }} – {{ row.humMax }}</TableCell
+            >
+            <TableCell class="text-right">{{
+              row.co2Slope.toFixed(4)
+            }}</TableCell>
+            <TableCell class="text-right">{{
+              row.co2SlopeMultiplier.toFixed(2)
+            }}</TableCell>
+            <TableCell class="text-right">{{ row.co2R2.toFixed(4) }}</TableCell>
+            <TableCell class="text-right">{{
+              row.latitude.toFixed(6)
+            }}</TableCell>
+            <TableCell class="text-right">{{
+              row.longitude.toFixed(6)
+            }}</TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>
     </div>
 
-    <div v-if="!loading && rows.length > 0" class="text-xs text-muted-foreground">
+    <div
+      v-if="!loading && rows.length > 0"
+      class="text-xs text-muted-foreground"
+    >
       Showing {{ rows.length }} record{{ rows.length !== 1 ? "s" : "" }}
     </div>
   </div>
 </template>
-
-<style scoped>
-table {
-  background-color: var(--background);
-}
-</style>
