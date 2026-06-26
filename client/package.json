@@ -9,7 +9,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "tauri": "tauri",
-    "android-build": "set VITE_USE_MOCK=false && tauri android build"
+    "android-build": "cross-env VITE_USE_MOCK=false tauri android build"
   },
   "dependencies": {
     "@formkit/auto-animate": "^0.9.0",
