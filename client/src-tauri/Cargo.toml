@@ -1,6 +1,6 @@
 [package]
 name = "dflux"
-version = "0.1.1"
+version = "0.2.0"
 description = "D Flux client"
 authors = ["Ingv"]
 edition = "2021"
